@@ -33,6 +33,7 @@ Dry-run rehearses research, two model responses and final payloads on synthetic 
 | METACULUS_OPENROUTER_KEY | Secret | Dedicated organizer-issued key for competition mode |
 | OPENROUTER_API_KEY | Secret | Dedicated separately funded key for paid mode |
 | PER_QUESTION_USD / MONTHLY_USD | Variables | Both default to zero. Example opt-in credit limits are `0.02` and `2.00`. Limits use nominal inference dollars including donated credit. |
+| TAVILY_API_KEY | Secret | Supplies one basic Tavily news search per forecasting attempt when donated AskNews is inactive. Use a free account with pay-as-you-go disabled. OpenRouter budget caps cover inference only. [Tavily pricing](https://docs.tavily.com/documentation/api-credits) |
 | ASKNEWS_API_KEY / ASKNEWS_COMPETITION_ACCESS | Secret / variable | Set the seasonal donated news key and `true` for latest-news retrieval. Use an account with paid overages disabled. Missing or unavailable search is disclosed in the explanation. |
 | FORECAST_PROFILE | Variable | `baseline` (one GPT-4.1 mini estimate) or `experimental` (adds GPT-4.1 causal scenarios) |
 | FORECAST_CALIBRATION | Variable | Binary log-odds multiplier, default `1`. Freeze any other value before evaluation. |

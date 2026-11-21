@@ -11,6 +11,7 @@ import time
 from contextlib import closing
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Protocol
 from urllib.parse import urlencode, urlsplit
 
@@ -87,25 +88,31 @@ class Evidence:
     summary: str
 
 
-def select_evidence(rows: list, as_of: datetime) -> list[Evidence]:
+def select_evidence(rows: list, as_of: datetime, *, tavily: bool = False) -> list[Evidence]:
     """Keep dated, unique results and prefer official domains among relevant hits."""
     found: dict[str, tuple[str, str, str]] = {}
+    if not isinstance(rows, list):
+        return []
     for row in rows:
         if not isinstance(row, dict):
             continue
         try:
-            url = row["article_url"]
+            url = row["url" if tavily else "article_url"]
             parts = urlsplit(url)
             host = (parts.hostname or "").lower()
-            published = datetime.fromisoformat(row["pub_date"].replace("Z", "+00:00"))
-            summary = row["summary"].strip()[:1200]
-            title = row["eng_title"].strip()[:240]
+            stamp = row["published_date" if tavily else "pub_date"]
+            try:
+                published = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+            except ValueError:
+                published = parsedate_to_datetime(stamp)
+            summary = row["content" if tavily else "summary"].strip()[:1200]
+            title = row["title" if tavily else "eng_title"].strip()[:240]
             if (published.tzinfo is None or published > as_of or not title or not summary
                     or not host or parts.scheme != "https" or parts.username or parts.password
                     or host == "metaculus.com" or host.endswith(".metaculus.com")
                     or re.search(r"[\s<>]", url)):
                 continue
-        except (AttributeError, KeyError, TypeError, ValueError):
+        except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
             continue
         found.setdefault(url, (published.isoformat(), title, summary))
     urls = sorted(found, key=lambda u: not urlsplit(u).hostname.endswith((".gov", ".gov.uk", ".gov.au", ".int")))
@@ -115,16 +122,32 @@ def select_evidence(rows: list, as_of: datetime) -> list[Evidence]:
 def research(q: Question, deadline: float, now: datetime) -> tuple[list[Evidence], str]:
     key = os.environ.get("ASKNEWS_API_KEY")
     if os.getenv("ASKNEWS_COMPETITION_ACCESS") != "true" or not key:
-        return [], "Donated AskNews access was not configured."
+        key = None
+    tavily_key = os.getenv("TAVILY_API_KEY")
+    if not key and not tavily_key:
+        return [], "No search provider was configured."
     available = deadline - time.monotonic()
     if available < 12:
         return [], "Research was skipped to preserve submission time."
+    search_deadline = time.monotonic() + min(15, available / 4)
+    if not key and tavily_key:
+        body = {"query": q.title, "topic": "news", "search_depth": "basic",
+                "auto_parameters": False, "max_results": 6, "time_range": "month",
+                "include_published_date": True, "include_answer": False,
+                "include_raw_content": False, "exclude_domains": ["metaculus.com"]}
+        try:
+            result = request_json("api.tavily.com", "/search", tavily_key, body, search_deadline)
+        except ProviderError:
+            return [], "The Tavily news search failed."
+        evidence = select_evidence(result.get("results"), now, tavily=True)
+        return evidence, ("Tavily supplied news snippets with estimated publication or update dates."
+                          if evidence else "Tavily returned no eligible dated news snippets.")
     params = {"query": q.context()["title"], "method": "nl", "strategy": "latest news",
               "return_type": "dicts", "n_articles": 8, "diversify_sources": "true",
               "bad_domain_url": "metaculus.com"}
     try:
         result = request_json("api.asknews.app", "/v1/news/search?" + urlencode(params),
-                              key, None, time.monotonic() + min(15, available / 4))
+                              key, None, search_deadline)
         evidence = select_evidence(result.get("as_dicts") or [], now)
     except ProviderError:
         return [], "The AskNews request failed."

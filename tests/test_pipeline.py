@@ -115,3 +115,38 @@ class PipelineTests(unittest.TestCase):
         model = Mock(side_effect=[dict(self.good, prediction="Yes"), pipeline.ProviderError("timeout")])
         with self.assertRaises(pipeline.ProviderError):
             self.replay(model)
+
+    def test_tavily_forecast_cites_only_eligible_dated_snippets(self):
+        result = {"url": "https://example.gov/release", "title": "Sensor release",
+                  "content": "Stable recent measurements.", "published_date": "Tue, 11 Mar 2025 17:00:00 GMT"}
+        rows = [result, result, dict(result, published_date=None),
+                dict(result, url="https://metaculus.com/latest"),
+                dict(result, published_date="2099-01-01T00:00:00Z")]
+        answer = dict(self.good, citations=[{"id": 1, "quote": result["content"]}])
+        completion = {"choices": [{"finish_reason": "stop", "message": {"content": json.dumps(answer)}}]}
+        env = {"TAVILY_API_KEY": "news-key", "FORECAST_FUNDING": "paid", "OPENROUTER_API_KEY": "model-key"}
+        with patch.dict(os.environ, env, clear=True), patch("pipeline.request_json",
+                side_effect=[{"results": rows}, completion]) as request:
+            payload, comment = pipeline.forecast(self.q, self.deadline, self.ledger, "baseline")
+        search, model = request.call_args_list
+        self.assertEqual(search.args[:3], ("api.tavily.com", "/search", "news-key"))
+        self.assertEqual(search.args[3]["search_depth"], "basic")
+        self.assertFalse(search.args[3]["auto_parameters"])
+        sources = json.loads(model.args[3]["messages"][1]["content"])["article_summaries"]
+        self.assertEqual([s["url"] for s in sources], [result["url"]])
+        self.assertEqual(payload["probability_yes"], .6)
+        self.assertIn("Tavily", comment)
+        self.assertIn(result["url"], comment)
+
+    def test_tavily_failure_deadline_and_asknews_precedence(self):
+        env = {"TAVILY_API_KEY": "fixture"}
+        with patch.dict(os.environ, env, clear=True), patch("pipeline.request_json",
+                  side_effect=pipeline.ProviderError("unavailable")) as request:
+            evidence, note = pipeline.research(self.q, self.deadline, self.now)
+            self.assertEqual(evidence, [])
+            self.assertIn("Tavily", note)
+            pipeline.research(self.q, time.monotonic() + 3, self.now)
+            request.assert_called_once()
+            with patch.dict(os.environ, {"ASKNEWS_COMPETITION_ACCESS": "true", "ASKNEWS_API_KEY": "fixture"}):
+                pipeline.research(self.q, self.deadline, self.now)
+            self.assertEqual(request.call_args.args[0], "api.asknews.app")
