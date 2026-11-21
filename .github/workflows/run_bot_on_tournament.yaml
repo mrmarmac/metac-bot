@@ -1,44 +1,62 @@
-name: Forecast on new AI tournament questions
-
+name: FutureEval
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [dry-run, test-area, production, init-state]
+        default: dry-run
+        description: Execution mode
   schedule:
-    - cron: "7,27,47 * * * *" # every 20 min, offset off the hour. Make sure to skip already-forecasted questions!
+    - cron: "7,27,47 * * * *"
 
-# Add concurrency group to prevent parallel runs
+permissions:
+  contents: read
 concurrency:
-  group: ${{ github.workflow }}
+  group: futureeval-account
   cancel-in-progress: false
-
-
-# Daily job to run the simple forecast bot
 jobs:
-  forecast_job:
-    runs-on: ubuntu-latest # determines the machine that will run the job - keep as is
-    steps: # sets up the steps that will be run in order
-      # setup repository with all necessary dependencies - keep as is
-      - name: Check out repository
-        uses: actions/checkout@v4
+  forecast:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && (github.event_name == 'workflow_dispatch' || vars.FUTUREEVAL_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
-          version: "0.13.1"
-      - name: Install dependencies
-        run: uv sync --locked
-      - name: Run bot
-        run: |
-          uv run python main.py
-        # this reads the environment variables from the github repository.
-        # Store under Settings --> Secrets and variables --> Actions
+          version: "0.13.9"
+      - run: uv sync --locked --no-dev
+      - name: Run autonomous agent
+        run: uv run --no-sync python runner.py --mode "$RUN_MODE"
         env:
-          METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }} # replace this with the name of the variable under which you stored your own Metaculus token
-          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
-          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          RUN_MODE: ${{ inputs.mode || 'production' }}
+          FUTUREEVAL_ENABLED: ${{ vars.FUTUREEVAL_ENABLED }}
+          METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }}
+          METACULUS_BOT_ID: ${{ vars.METACULUS_BOT_ID }}
+          GH_STATE_TOKEN: ${{ github.token }}
+          STATE_KEY: ${{ secrets.STATE_KEY }}
+          FORECAST_FUNDING: ${{ vars.FORECAST_FUNDING || 'disabled' }}
+          FORECAST_PROFILE: ${{ vars.FORECAST_PROFILE || 'baseline' }}
+          FORECAST_CALIBRATION: ${{ vars.FORECAST_CALIBRATION || '1.0' }}
+          METACULUS_OPENROUTER_KEY: ${{ secrets.METACULUS_OPENROUTER_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ASKNEWS_CLIENT_ID: ${{ secrets.ASKNEWS_CLIENT_ID }}
-          ASKNEWS_SECRET: ${{ secrets.ASKNEWS_SECRET }}
+          ASKNEWS_API_KEY: ${{ secrets.ASKNEWS_API_KEY }}
+          ASKNEWS_COMPETITION_ACCESS: ${{ vars.ASKNEWS_COMPETITION_ACCESS }}
+          PER_QUESTION_USD: ${{ vars.PER_QUESTION_USD }}
+          MONTHLY_USD: ${{ vars.MONTHLY_USD }}
+          SEASON_ID: ${{ vars.SEASON_ID }}
+          MINIBENCH_ID: ${{ vars.MINIBENCH_ID }}
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('health.json') != ''
+        with:
+          name: health
+          path: health.json
+          retention-days: 30

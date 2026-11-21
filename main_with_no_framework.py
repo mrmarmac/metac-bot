@@ -1622,28 +1622,5 @@ def _print_no_framework_summary_banner(
 
 ######################## FINAL RUN #########################
 if __name__ == "__main__":
-    check_environment(strict=True)
-
-    active_tournament_id = BOT_TESTING_AREA_ID if USE_EXAMPLE_QUESTIONS else TOURNAMENT_ID
-    # Banner footer link. Constructable from string slugs (e.g. "bot-testing-area");
-    # left blank for numeric tournament IDs since we don't have the slug.
-    active_tournament_url = (
-        f"https://www.metaculus.com/tournament/{active_tournament_id}/"
-        if isinstance(active_tournament_id, str)
-        else None
-    )
-
-    publish = "publish=yes" if SUBMIT_PREDICTION else "publish=no (dry run)"
-    print(f"🤖  no-framework bot, tournament={active_tournament_id}, {publish}\n")
-
-    open_question_id_post_id = get_open_question_ids_from_tournament(active_tournament_id)
-
-    asyncio.run(
-        forecast_questions(
-            open_question_id_post_id,
-            SUBMIT_PREDICTION,
-            NUM_RUNS_PER_QUESTION,
-            SKIP_PREVIOUSLY_FORECASTED_QUESTIONS,
-            tournament_url=active_tournament_url,
-        )
-    )
+    from runner import main
+    raise SystemExit(main())
