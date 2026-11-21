@@ -1,0 +1,109 @@
+{
+  "experiment": "Walk-forward FOMC reference-class comparison",
+  "holdout_start": "2024-01-01",
+  "last_decision": "2025-12-10",
+  "measurement_unit": "scheduled FOMC meeting, four correlated question formats",
+  "evaluated_meetings": 16,
+  "python": "3.12.13",
+  "git_base": "cc3e853121579231d106474d53b713eec7ffe238",
+  "inputs_differ_from_base": false,
+  "sha256": {
+    "evaluation.py": "60a737da841c159f08e3783578405fc7a32770add39860d9f97a428d1eb0d8c9",
+    "formats.py": "2e0762226460a7fa1f52ae66ab79fc3336d3ef94dd4f711f53209247857d6962",
+    "pipeline.py": "b809cdbdd0a78bd8c6185e373b2825692658ee7c9f64c69dd2d820577fbc1cfb",
+    "uv.lock": "1e92f5c40365f1cd9978af71db7d351ec216e3ac5cfc2f5d5057d31d76f8326f",
+    "fixtures/fomc_decisions.csv": "3fedd0bbb1b942ea4c914f1af5191f8809a24fb4b068cc88b5367ab30a6742c7"
+  },
+  "profiles": {
+    "baseline": {
+      "windows_in_meetings": [
+        null
+      ],
+      "calibration": 1.0,
+      "eligible": 64,
+      "scored": 64,
+      "coverage": 1.0,
+      "losses_lower_is_better": {
+        "binary_brier": 0.29107927949942985,
+        "binary_log_loss": 0.7771780201326738,
+        "multiple_choice_log_loss": 1.4058969675684798,
+        "numeric_crps_bp": 20.603249451487567,
+        "discrete_normalized_rps": 0.10067349135846423
+      },
+      "binary_reliability_bins": [
+        {
+          "interval": [
+            0.2,
+            0.4
+          ],
+          "n": 2,
+          "mean_prediction": 0.3508771929824561,
+          "event_frequency": 1.0
+        },
+        {
+          "interval": [
+            0.4,
+            0.6
+          ],
+          "n": 14,
+          "mean_prediction": 0.4625181646870514,
+          "event_frequency": 0.5714285714285714
+        }
+      ],
+      "failures": [],
+      "runtime_seconds": 1.867735,
+      "model_calls": 0,
+      "api_cost_usd": 0
+    },
+    "experimental": {
+      "windows_in_meetings": [
+        null,
+        4
+      ],
+      "calibration": 1.0,
+      "eligible": 64,
+      "scored": 64,
+      "coverage": 1.0,
+      "losses_lower_is_better": {
+        "binary_brier": 0.25905365932064645,
+        "binary_log_loss": 0.7123138419915145,
+        "multiple_choice_log_loss": 1.0855967741569466,
+        "numeric_crps_bp": 12.52819399075812,
+        "discrete_normalized_rps": 0.05891504711957816
+      },
+      "binary_reliability_bins": [
+        {
+          "interval": [
+            0.2,
+            0.4
+          ],
+          "n": 2,
+          "mean_prediction": 0.3835470085470085,
+          "event_frequency": 1.0
+        },
+        {
+          "interval": [
+            0.4,
+            0.6
+          ],
+          "n": 7,
+          "mean_prediction": 0.5235875823683706,
+          "event_frequency": 0.42857142857142855
+        },
+        {
+          "interval": [
+            0.6,
+            0.8
+          ],
+          "n": 7,
+          "mean_prediction": 0.6413757979217912,
+          "event_frequency": 0.7142857142857143
+        }
+      ],
+      "failures": [],
+      "runtime_seconds": 0.025278,
+      "model_calls": 0,
+      "api_cost_usd": 0
+    }
+  }
+}
